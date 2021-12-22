@@ -2,8 +2,10 @@ import json
 import random
 import os
 from itertools import cycle, islice
+from contextlib import suppress
 
 import trio
+import asyncclick as click
 from trio_websocket import open_websocket_url
 
 
@@ -31,7 +33,7 @@ def get_current_coordinates(route):
             yield next(current_coordinates)
 
 
-async def run_bus(bus_id, index, route, send_channel):
+async def run_bus(bus_id, index, route, send_channel, refresh_timeout):
     """"""
     for coordinates in get_current_coordinates(route):
 
@@ -42,7 +44,7 @@ async def run_bus(bus_id, index, route, send_channel):
             "route": bus_id
         }
         await send_channel.send(message)
-        await trio.sleep(0.1)
+        await trio.sleep(refresh_timeout)
 
 
 async def send_updates(server_address, receive_channel):
@@ -52,26 +54,64 @@ async def send_updates(server_address, receive_channel):
             await ws.send_message(json.dumps(message))
 
 
-async def main(max_sockets=5, max_routes=350):
-    async with trio.open_nursery() as nursery:
-        bus_copies = 5
+@click.command()
+@click.option(
+    "--routes_number", default=100,
+    help="Number of busses routes.",
+)
+@click.option(
+    "--buses_per_route", default=10,
+    help="The number of buses on each route."
+)
+@click.option(
+    "--server", default='ws://127.0.0.1:8080',
+    help="Server address."
+)
+@click.option(
+    "--websockets_number", default=5,
+    help="The number of websockets."
+)
+@click.option(
+    "--emulator_id", default='default_emulator',
+    help="Prefix to busId in case of running "
+         "multiple instances of the simulator."
+)
+@click.option(
+    "--refresh_timeout", default=0.3,
+    help="Delay in updating server coordinates."
+)
+@click.option(
+    "--v", default='',
+    help="Setting up logging."
+)
+async def main(**kwargs):
+    routes_number = kwargs.get('routes_number')
+    buses_per_route = kwargs.get('buses_per_route')
+    server_url = kwargs.get('server')
+    websockets_number = kwargs.get('websockets_number')
+    refresh_timeout = kwargs.get('refresh_timeout')
 
-        channels = [trio.open_memory_channel(0) for _ in range(max_sockets)]
+    async with trio.open_nursery() as nursery:
+        channels = [
+            trio.open_memory_channel(0) for _ in range(websockets_number)
+        ]
         for _, receive_channel in channels:
             nursery.start_soon(
-                send_updates, 'ws://127.0.0.1:8080',
+                send_updates, server_url,
                 receive_channel,
             )
 
-        for route in islice(load_routes(), max_routes):
+        for route in islice(load_routes(), routes_number):
 
-            for index in range(bus_copies):
+            for index in range(buses_per_route):
                 send_channel, _ = random.choice(channels)
                 bus_id = route.get('name')
 
                 nursery.start_soon(
                     run_bus, bus_id, index,
-                    route, send_channel,
+                    route, send_channel, refresh_timeout,
                 )
 
-trio.run(main)
+if __name__ == '__main__':
+    with suppress(KeyboardInterrupt):
+        main(_anyio_backend="trio")
