@@ -15,8 +15,7 @@ async def recipient_server(request):
             bus_info = await ws.get_message()
             formatted_bus_info = json.loads(bus_info)
             buses[formatted_bus_info['busId']] = formatted_bus_info
-            # print(buses)
-            await trio.sleep(0.1)
+            # await trio.sleep(0.1)
         except ConnectionClosed:
             break
 
