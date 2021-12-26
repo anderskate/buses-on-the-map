@@ -1,6 +1,7 @@
 import json
 
 import trio
+from loguru import logger
 from trio_websocket import serve_websocket, open_websocket_url, ConnectionClosed
 from sys import stderr
 
@@ -32,7 +33,18 @@ async def talk_to_browser(request):
             }
             print(message)
             await ws.send_message(json.dumps(message))
+            await listen_browser(ws)
             await trio.sleep(0.1)
+        except ConnectionClosed:
+            break
+
+
+async def listen_browser(ws):
+    """"""
+    while True:
+        try:
+            browser_coordinates = await ws.get_message()
+            logger.info(json.loads(browser_coordinates))
         except ConnectionClosed:
             break
 
