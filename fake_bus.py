@@ -1,12 +1,28 @@
 import json
 import random
+import time
 import os
 from itertools import cycle, islice
 from contextlib import suppress
+from functools import wraps
 
 import trio
 import asyncclick as click
-from trio_websocket import open_websocket_url
+from trio_websocket import open_websocket_url, ConnectionClosed
+from trio_websocket import ConnectionTimeout, ConnectionRejected
+
+
+def relaunch_on_disconnect(async_function, timeout=3):
+    """Decorator for network reconnection retries."""
+    @wraps(async_function)
+    async def wrapper(*args, **kwargs):
+        while True:
+            try:
+                await async_function(*args, **kwargs)
+            except (ConnectionRejected, ConnectionClosed):
+                print(f'Try to connect again after {timeout} sec.')
+                time.sleep(timeout)
+    return wrapper
 
 
 def load_routes(directory_path='routes'):
@@ -47,6 +63,7 @@ async def run_bus(bus_id, index, route, send_channel, refresh_timeout):
         await trio.sleep(refresh_timeout)
 
 
+@relaunch_on_disconnect
 async def send_updates(server_address, receive_channel):
     """"""
     async with open_websocket_url(server_address) as ws:
