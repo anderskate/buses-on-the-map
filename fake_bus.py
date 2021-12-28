@@ -40,7 +40,9 @@ def generate_bus_id(route_id, bus_index):
 def get_current_coordinates(route):
     """"""
     coordinates = route.get('coordinates')
-    current_coordinates = islice(coordinates, random.randint(0, len(route) - 1), None)
+    current_coordinates = islice(
+        coordinates, random.randint(0, len(coordinates)), None
+    )
     while True:
         try:
             yield next(current_coordinates)
