@@ -1,28 +1,39 @@
-# Автобусы на карте Москвы
+# Buses on Moscow map
 
-Веб-приложение показывает передвижение автобусов на карте Москвы.
+The web application shows the movement of buses on a map of Moscow.
+
+The Trio websocket library is used as the basis for the backend.
 
 <img src="screenshots/buses.gif">
 
-## Как запустить
+# How to install
 
-- Скачайте код
-- Откройте в браузере файл index.html
+- Download the repository and open the folder with project
+
+- Install requirements libraries and packages:
+```bash
+pip3 install -r requirements.txt
+```
+
+# How to run
+- Open on browser web page `index.html`
+- Run script `server.py` in shell
+- Run script `fake_bus.py` in shell to generate fake buses on the map
 
 
-## Настройки
+## Settings
 
-Внизу справа на странице можно включить отладочный режим логгирования и указать нестандартный адрес веб-сокета.
+At the bottom right of the page, you can enable debug logging mode and specify a non-standard web socket address.
 
 <img src="screenshots/settings.png">
 
-Настройки сохраняются в Local Storage браузера и не пропадают после обновления страницы. Чтобы сбросить настройки удалите ключи из Local Storage с помощью Chrome Dev Tools —> Вкладка Application —> Local Storage.
+The settings are saved in the Local Storage of the browser and do not disappear after refreshing the page. To reset the settings, delete keys from Local Storage using Chrome Dev Tools -> Application tab -> Local Storage.
 
-Если что-то работает не так, как ожидалось, то начните с включения отладочного режима логгирования.
+If something doesn't work as expected, then start by enabling debug logging mode.
 
-## Формат данных
+## Data format
 
-Фронтенд ожидает получить от сервера JSON сообщение со списком автобусов:
+The frontend expects to receive a JSON message from the server with a list of buses:
 
 ```js
 {
@@ -34,9 +45,10 @@
 }
 ```
 
-Те автобусы, что не попали в список `buses` последнего сообщения от сервера будут удалены с карты.
 
-Фронтенд отслеживает перемещение пользователя по карте и отправляет на сервер новые координаты окна:
+Those buses that were not included in the `buses` list of the last message from the server will be removed from the map.
+
+The frontend tracks the user's movement on the map and sends new window coordinates to the server:
 
 ```js
 {
@@ -52,12 +64,7 @@
 
 
 
-## Используемые библиотеки
+## Used js libraries
 
-- [Leaflet](https://leafletjs.com/) — отрисовка карты
-- [loglevel](https://www.npmjs.com/package/loglevel) для логгирования
-
-
-## Цели проекта
-
-Код написан в учебных целях — это урок в курсе по Python и веб-разработке на сайте [Devman](https://dvmn.org).
+- [Leaflet](https://leafletjs.com/) — map rendering
+- [loglevel](https://www.npmjs.com/package/loglevel) - for logging
