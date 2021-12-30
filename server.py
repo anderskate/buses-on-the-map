@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, asdict
 from contextlib import suppress
+from functools import partial
 
 import trio
 import asyncclick as click
@@ -43,8 +44,36 @@ class WindowBounds:
         self.east_lng = east_lng
 
 
+class ServerResponseException(Exception):
+    pass
+
+
+@dataclass
+class BrowserMsg:
+    """"""
+    msgType: str
+    data: dict
+
+    @classmethod
+    def validate(cls, msg):
+        try:
+            converted_msg = json.loads(msg)
+        except json.decoder.JSONDecodeError:
+            raise ServerResponseException('Requires valid JSON')
+
+        msg_type = converted_msg.get('msgType')
+        if not msg_type:
+            raise ServerResponseException('Requires msgType specified')
+
+        return converted_msg
+
+    @classmethod
+    def get_browser_msg_from_json(cls, msg):
+        validated_msg = cls.validate(msg)
+        return cls(**validated_msg)
+
+
 buses: {str: Bus} = {}
-bounds: WindowBounds = WindowBounds()
 
 
 async def get_buses_info(request):
@@ -62,12 +91,18 @@ async def get_buses_info(request):
             break
 
 
-async def talk_to_browser(request):
-    global buses, bounds
+async def talk_to_browser(request, bounds):
+    global buses
 
     ws = await request.accept()
     while True:
         try:
+
+            # When listening to data from the browser,
+            # the 'bounds' object can change if the coordinates
+            # of the open window in the browser have changed.
+            await listen_browser(ws, bounds)
+
             message = {
                 "msgType": "Buses",
                 "buses": [
@@ -80,22 +115,32 @@ async def talk_to_browser(request):
             logger.info(f'{buses_count} buses inside bounds')
 
             await ws.send_message(json.dumps(message))
-            await listen_browser(ws)
             await trio.sleep(0.1)
         except ConnectionClosed:
             break
 
 
-async def listen_browser(ws, wait_msg_timeout=0.1):
+async def listen_browser(ws, bounds, wait_msg_timeout=0.1):
     """"""
-    global bounds
     try:
         with trio.fail_after(wait_msg_timeout):
-            data_from_browser = await ws.get_message()
-            formatted_browser_data = json.loads(data_from_browser).get('data')
-            bounds.update(**formatted_browser_data)
+            msg_from_browser = await ws.get_message()
 
-        logger.info(formatted_browser_data)
+        try:
+            browser_msg = BrowserMsg.get_browser_msg_from_json(
+                msg_from_browser
+            )
+        except ServerResponseException as error:
+            error_response = {
+                "msgType": "Errors",
+                "errors": [str(error)]
+            }
+            await ws.send_message(json.dumps(error_response))
+            return
+
+        if browser_msg.data:
+            bounds.update(**browser_msg.data)
+        logger.info(browser_msg)
     except ConnectionClosed:
         pass
     except trio.TooSlowError:
@@ -124,13 +169,14 @@ async def main(**kwargs):
     browser_port = kwargs.get('browser_port')
     server_host = kwargs.get('host')
 
+    bounds = WindowBounds()
     async with trio.open_nursery() as nursery:
         nursery.start_soon(
             serve_websocket, get_buses_info,
             server_host, bus_port, None,
         )
         nursery.start_soon(
-            serve_websocket, talk_to_browser,
+            serve_websocket, partial(talk_to_browser, bounds=bounds),
             server_host, browser_port, None,
         )
 
