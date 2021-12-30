@@ -20,10 +20,10 @@ class Bus:
 @dataclass
 class WindowBounds:
     """Representation coordinates browser window at time."""
-    south_lat: float
-    north_lat: float
-    west_lng: float
-    east_lng: float
+    south_lat: float = None
+    north_lat: float = None
+    west_lng: float = None
+    east_lng: float = None
 
     def is_inside(self, lat, lng):
         """"""
@@ -34,9 +34,16 @@ class WindowBounds:
             return True
         return False
 
+    def update(self, south_lat, north_lat, west_lng, east_lng):
+        """"""
+        self.south_lat = south_lat
+        self.north_lat = north_lat
+        self.west_lng = west_lng
+        self.east_lng = east_lng
+
 
 buses: {str: Bus} = {}
-bounds: WindowBounds = Optional[None]
+bounds: WindowBounds = WindowBounds()
 
 
 async def get_buses_info(request):
@@ -55,7 +62,7 @@ async def get_buses_info(request):
 
 
 async def talk_to_browser(request):
-    global buses
+    global buses, bounds
 
     ws = await request.accept()
     while True:
@@ -85,7 +92,7 @@ async def listen_browser(ws, wait_msg_timeout=0.1):
         with trio.fail_after(wait_msg_timeout):
             data_from_browser = await ws.get_message()
             formatted_browser_data = json.loads(data_from_browser).get('data')
-            bounds = WindowBounds(**formatted_browser_data)
+            bounds.update(**formatted_browser_data)
 
         logger.info(formatted_browser_data)
     except ConnectionClosed:
