@@ -18,6 +18,26 @@ class Bus:
     lng: float
     route: str
 
+    @classmethod
+    def validate(cls, json_msg):
+        """"""
+        try:
+            converted_msg = json.loads(json_msg)
+        except json.decoder.JSONDecodeError:
+            raise ServerResponseException('Requires valid JSON')
+
+        msg_type = converted_msg.get('busId')
+        if not msg_type:
+            raise ServerResponseException('Requires busId specified')
+
+        return converted_msg
+
+    @classmethod
+    def get_bus_from_json(cls, json_msg):
+        """"""
+        validated_msg = cls.validate(json_msg)
+        return cls(**validated_msg)
+
 
 @dataclass
 class WindowBounds:
@@ -82,10 +102,15 @@ async def get_buses_info(request):
     while True:
         try:
             bus_info = await ws.get_message()
-            formatted_bus_info = json.loads(bus_info)
-            bus = Bus(**formatted_bus_info)
+            try:
+                bus = Bus.get_bus_from_json(bus_info)
+            except ServerResponseException as error:
+                error_response = json.dumps(
+                    {"msgType": "Errors", "errors": [str(error)]}
+                )
+                await ws.send_message(error_response)
+                continue
             buses[bus.busId] = bus
-
             # await trio.sleep(0.1)
         except ConnectionClosed:
             break
