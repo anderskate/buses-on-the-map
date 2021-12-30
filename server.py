@@ -1,8 +1,9 @@
 import json
 from dataclasses import dataclass, asdict
-from typing import Optional
+from contextlib import suppress
 
 import trio
+import asyncclick as click
 from loguru import logger
 from trio_websocket import serve_websocket, open_websocket_url, ConnectionClosed
 from sys import stderr
@@ -101,15 +102,39 @@ async def listen_browser(ws, wait_msg_timeout=0.1):
         pass
 
 
-async def main():
+@click.command()
+@click.option(
+    "--bus_port", default=8080,
+    help="Port for bus imitator.",
+)
+@click.option(
+    "--browser_port", default=8000,
+    help="Port for browser."
+)
+@click.option(
+    "--host", default='127.0.0.1',
+    help="Server host."
+)
+@click.option(
+    "--v", default='',
+    help="Logging settings."
+)
+async def main(**kwargs):
+    bus_port = kwargs.get('bus_port')
+    browser_port = kwargs.get('browser_port')
+    server_host = kwargs.get('host')
+
     async with trio.open_nursery() as nursery:
         nursery.start_soon(
             serve_websocket, get_buses_info,
-            '127.0.0.1', 8080, None,
+            server_host, bus_port, None,
         )
         nursery.start_soon(
             serve_websocket, talk_to_browser,
-            '127.0.0.1', 8000, None,
+            server_host, browser_port, None,
         )
 
-trio.run(main)
+
+if __name__ == '__main__':
+    with suppress(KeyboardInterrupt):
+        main(_anyio_backend="trio")
